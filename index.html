@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeToad — Interactive Demo</title>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0B0F14;
+      --surface:  #111820;
+      --border:   #1E2730;
+      --text:     #E6EDF3;
+      --muted:    #9AA4AE;
+      --green:    #38E07B;
+      --yellow:   #FFB020;
+      --red:      #FF5C5C;
+      --blue:     #58A6FF;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
+
+    /* ─── Outer Shell ───────────────────────────────────────────── */
+    #demo-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      gap: 16px;
+    }
+
+    /* ─── Top Bar ───────────────────────────────────────────────── */
+    #top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .logo-area { display: flex; align-items: center; gap: 10px; }
+    .logo-area img { width: 32px; height: 32px; border-radius: 6px; }
+    .logo-area span { font-size: 18px; font-weight: 700; color: var(--text); }
+    .demo-badge {
+      background: linear-gradient(135deg, #38E07B22, #38E07B44);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .cta-btn {
+      background: var(--green);
+      color: #0B0F14;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 10px 22px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: box-shadow 0.2s;
+    }
+    .cta-btn:hover { box-shadow: 0 0 20px rgba(56,224,123,0.4); }
+
+    /* ─── Step Nav ──────────────────────────────────────────────── */
+    #step-nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .step-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .step-pill:hover { border-color: #38E07B55; color: var(--text); }
+    .step-pill.active {
+      border-color: var(--green);
+      background: #38E07B15;
+      color: var(--green);
+      font-weight: 600;
+    }
+    .step-num {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-pill.active .step-num { background: var(--green); color: #0B0F14; }
+    .step-sep { color: var(--border); font-size: 18px; flex-shrink: 0; }
+
+    /* ─── Screen Viewport ───────────────────────────────────────── */
+    #screen-viewport {
+      flex: 1;
+      position: relative;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background: var(--surface);
+      min-height: 0;
+    }
+
+    /* Browser chrome */
+    .browser-chrome {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: #0D1117;
+      border-bottom: 1px solid var(--border);
+    }
+    .chrome-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .chrome-dot.red { background: #FF5F57; }
+    .chrome-dot.yellow { background: #FFBD2E; }
+    .chrome-dot.green { background: #28C840; }
+    .chrome-url {
+      flex: 1;
+      background: #161B22;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: monospace;
+    }
+
+    /* Screen content area */
+    .screen-content {
+      position: absolute;
+      inset: 0;
+      top: 42px; /* below browser chrome */
+      overflow: hidden;
+    }
+    .screen-frame {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      overflow: auto;
+    }
+    .screen-frame.active { display: block; }
+    .screen-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+      display: block;
+    }
+
+    /* ─── Hotspot Overlays ──────────────────────────────────────── */
+    .hotspot {
+      position: absolute;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .hotspot-pulse {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(56,224,123,0.25);
+      border: 2px solid var(--green);
+      display: flex; align-items: center; justify-content: center;
+      animation: pulse 2s infinite;
+      transition: transform 0.2s;
+    }
+    .hotspot:hover .hotspot-pulse { transform: scale(1.2); }
+    .hotspot-pulse::after {
+      content: '';
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(56,224,123,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(56,224,123,0); }
+    }
+
+    /* Tooltip */
+    .hotspot-tooltip {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1C2333;
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 10px 14px;
+      width: 220px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 20;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .hotspot-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: var(--green);
+    }
+    .hotspot:hover .hotspot-tooltip { opacity: 1; }
+    .tooltip-title { font-weight: 700; color: var(--green); margin-bottom: 4px; font-size: 13px; }
+
+    /* ─── Bottom Controls ───────────────────────────────────────── */
+    #bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nav-btn:hover:not(:disabled) { border-color: var(--green); color: var(--green); }
+    .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .nav-btn.primary { background: var(--green); color: #0B0F14; border-color: var(--green); font-weight: 700; }
+    .nav-btn.primary:hover { box-shadow: 0 0 16px rgba(56,224,123,0.35); }
+
+    .step-counter { font-size: 13px; color: var(--muted); }
+    .step-counter strong { color: var(--text); }
+
+    /* ─── Annotation Panel ──────────────────────────────────────── */
+    #annotation {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(17,24,32,0.95);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 20px;
+      max-width: 600px;
+      width: calc(100% - 48px);
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+      backdrop-filter: blur(8px);
+      z-index: 30;
+      pointer-events: none;
+    }
+    #annotation strong { color: var(--text); }
+
+    /* ─── Screens: Rendered HTML (non-image) ────────────────────── */
+    .rendered-screen {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: var(--bg);
+    }
+
+    /* Landing page screen */
+    .landing-hero {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 24px;
+      text-align: center;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, #38E07B0D, transparent);
+    }
+    .landing-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #38E07B15; border: 1px solid #38E07B44;
+      color: var(--green); font-size: 12px; font-weight: 600;
+      padding: 5px 14px; border-radius: 20px; margin-bottom: 24px;
+    }
+    .landing-h1 { font-size: clamp(32px, 5vw, 56px); font-weight: 800; line-height: 1.15; margin-bottom: 20px; }
+    .landing-h1 span { color: var(--green); }
+    .landing-sub { font-size: 18px; color: var(--muted); max-width: 560px; margin-bottom: 40px; line-height: 1.6; }
+    .landing-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 60px; }
+    .btn-primary { background: var(--green); color: #0B0F14; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 8px; border: none; cursor: pointer; }
+    .btn-secondary { background: transparent; color: var(--text); font-weight: 600; font-size: 15px; padding: 14px 28px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; }
+    .landing-features {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+      max-width: 900px; width: 100%;
+    }
+    .feat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px; text-align: left;
+    }
+    .feat-icon { font-size: 28px; margin-bottom: 12px; }
+    .feat-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .feat-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* Auth screen */
+    .auth-screen {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      background: var(--bg);
+    }
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .auth-title { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+    .auth-sub { font-size: 14px; color: var(--muted); text-align: center; margin-bottom: 28px; }
+    .auth-github-btn {
+      width: 100%; padding: 13px; background: var(--green); color: #0B0F14;
+      font-weight: 700; font-size: 15px; border: none; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px;
+    }
+    .auth-divider { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .auth-divider span { font-size: 12px; color: var(--muted); }
+    .auth-field { margin-bottom: 16px; }
+    .auth-label { font-size: 13px; font-weight: 500; margin-bottom: 6px; display: block; }
+    .auth-input {
+      width: 100%; padding: 11px 14px; background: #0B0F14;
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 14px;
+    }
+    .auth-submit {
+      width: 100%; padding: 13px; background: var(--surface);
+      border: 1px solid var(--border); color: var(--text);
+      font-weight: 600; font-size: 15px; border-radius: 8px; cursor: pointer; margin-top: 4px;
+    }
+    .auth-trust { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+    .auth-trust-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .auth-trust-icon { color: var(--green); }
+
+    /* Dashboard screen */
+    .dash-layout { display: flex; height: 100%; }
+    .dash-sidebar {
+      width: 180px; flex-shrink: 0;
+      background: #0D1117; border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .sidebar-logo { display: flex; align-items: center; gap: 8px; padding: 8px; margin-bottom: 12px; }
+    .sidebar-logo img { width: 24px; height: 24px; border-radius: 4px; }
+    .sidebar-logo span { font-weight: 700; font-size: 15px; }
+    .sidebar-item {
+      padding: 8px 10px; border-radius: 6px; font-size: 13px;
+      color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 8px;
+    }
+    .sidebar-item:hover, .sidebar-item.active { background: #38E07B15; color: var(--green); }
+    .sidebar-section { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--border); padding: 8px 10px 4px; margin-top: 8px; }
+    .sidebar-repo { padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .sidebar-repo::before { content: '●'; font-size: 8px; color: var(--green); }
+    .dash-main { flex: 1; padding: 20px 24px; overflow: auto; }
+    .dash-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    }
+    .dash-topbar-right { display: flex; align-items: center; gap: 10px; }
+    .connected-badge { background: #38E07B15; border: 1px solid var(--green); color: var(--green); font-size: 12px; padding: 5px 10px; border-radius: 6px; display: flex; align-items: center; gap: 5px; }
+    .token-badge { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 5px 10px; border-radius: 6px; }
+    .buy-btn { background: var(--green); color: #0B0F14; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: #111820; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 10px; }
+    .stat-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .stat-val { font-size: 22px; font-weight: 700; }
+    .stat-lbl { font-size: 11px; color: var(--muted); }
+    .repo-table { background: #111820; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .repo-table-header { display: grid; grid-template-columns: 3fr 1fr 4fr 2fr 1fr; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); font-weight: 500; }
+    .repo-row { display: grid; grid-template-columns: 3fr 1fr 4fr 2fr 1fr; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; }
+    .repo-row:hover { background: #1a2030; }
+    .repo-row:last-child { border-bottom: none; }
+    .repo-name { font-size: 13px; font-weight: 600; }
+    .repo-lang { font-size: 11px; color: var(--muted); }
+    .status-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #38E07B15; color: var(--green); }
+    .issue-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+    .issue-pill { font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+    .pill-inc { background: #FFB02015; color: var(--yellow); }
+    .pill-bug { background: #FF5C5C15; color: var(--red); }
+    .pill-sec { background: #FF5C5C15; color: var(--red); }
+    .health-score { font-size: 14px; font-weight: 700; font-family: monospace; }
+    .score-good { color: var(--green); }
+    .score-warn { color: var(--yellow); }
+    .score-bad { color: var(--red); }
+    .dash-right { width: 260px; flex-shrink: 0; padding: 20px 16px; border-left: 1px solid var(--border); overflow: auto; }
+    .metrics-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .metric-card { background: #111820; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+    .metric-lbl { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .metric-val { font-size: 20px; font-weight: 700; }
+    .task-item { background: #111820; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; }
+    .task-repo { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+    .task-desc { font-size: 12px; color: var(--text); line-height: 1.4; }
+
+    /* Health report screen */
+    .health-layout { padding: 20px 24px; overflow: auto; height: 100%; background: var(--bg); }
+    .health-back { font-size: 13px; color: var(--muted); margin-bottom: 16px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .health-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .health-repo-icon { width: 40px; height: 40px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .health-repo-name { font-size: 22px; font-weight: 700; }
+    .health-repo-meta { font-size: 13px; color: var(--muted); }
+    .health-actions { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+    .health-action-btn { padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .health-action-btn.primary { background: var(--green); color: #0B0F14; border-color: var(--green); }
+    .health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .health-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .health-card-title { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .score-ring { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .score-circle { position: relative; width: 120px; height: 120px; margin-bottom: 8px; }
+    .score-circle svg { transform: rotate(-90deg); }
+    .score-circle-val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .score-big { font-size: 32px; font-weight: 800; color: var(--green); }
+    .score-denom { font-size: 13px; color: var(--muted); }
+    .score-label { font-size: 14px; font-weight: 600; color: var(--green); }
+    .score-issues { font-size: 12px; color: var(--muted); }
+    .dist-bars { display: flex; align-items: flex-end; gap: 12px; height: 80px; }
+    .dist-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+    .dist-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; }
+    .dist-val { font-size: 14px; font-weight: 700; }
+    .dist-lbl { font-size: 10px; color: var(--muted); }
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .metric-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .metric-tile-name { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .metric-tile-val { font-size: 20px; font-weight: 700; }
+    .metric-tile-icon { float: right; font-size: 16px; }
+
+    /* Workspace screen */
+    .workspace-layout { display: flex; height: 100%; }
+    .ws-sidebar { width: 200px; flex-shrink: 0; background: #0D1117; border-right: 1px solid var(--border); padding: 12px; overflow: auto; }
+    .ws-agent-card { background: #38E07B15; border: 1px solid #38E07B44; border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+    .ws-agent-title { font-size: 12px; font-weight: 700; color: var(--green); margin-bottom: 2px; }
+    .ws-agent-sub { font-size: 10px; color: var(--muted); }
+    .ws-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    .ws-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; text-align: center; }
+    .ws-stat-val { font-size: 16px; font-weight: 700; color: var(--green); }
+    .ws-stat-lbl { font-size: 9px; color: var(--muted); }
+    .ws-stat-val.warn { color: var(--yellow); }
+    .ws-stat-val.red { color: var(--red); }
+    .ws-btns { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .ws-btn { padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; text-align: center; }
+    .ws-btn.primary { background: var(--green); color: #0B0F14; border-color: var(--green); }
+    .ws-files-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+    .ws-file { font-size: 11px; color: var(--muted); padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ws-file:hover { background: var(--surface); color: var(--text); }
+    .ws-file.active { background: #38E07B15; color: var(--green); }
+    .ws-editor { flex: 1; display: flex; flex-direction: column; background: #0D1117; }
+    .ws-editor-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+    .ws-tab { padding: 8px 16px; font-size: 12px; color: var(--muted); border-right: 1px solid var(--border); cursor: pointer; }
+    .ws-tab.active { color: var(--text); background: var(--bg); border-bottom: 2px solid var(--green); }
+    .ws-code { flex: 1; padding: 16px; font-family: 'Fira Code', 'Courier New', monospace; font-size: 12px; line-height: 1.7; color: #ABB2BF; overflow: auto; }
+    .ws-code .kw { color: #C678DD; }
+    .ws-code .fn { color: #61AFEF; }
+    .ws-code .str { color: #98C379; }
+    .ws-code .cm { color: #5C6370; font-style: italic; }
+    .ws-code .num { color: #D19A66; }
+    .ws-code .ln { color: #4B5263; margin-right: 16px; user-select: none; display: inline-block; width: 24px; text-align: right; }
+    .ws-chat { width: 280px; flex-shrink: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg); }
+    .ws-chat-header { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; }
+    .ws-chat-sub { font-size: 11px; color: var(--muted); font-weight: 400; }
+    .ws-chat-body { flex: 1; padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+    .chat-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; text-align: center; gap: 8px; }
+    .chat-empty-icon { font-size: 32px; opacity: 0.4; }
+    .chat-msg { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; }
+    .chat-msg.user { background: #38E07B15; border: 1px solid #38E07B33; color: var(--text); align-self: flex-end; max-width: 85%; }
+    .chat-msg.ai { background: var(--surface); border: 1px solid var(--border); color: var(--text); align-self: flex-start; max-width: 90%; }
+    .chat-msg.ai .ai-label { font-size: 10px; color: var(--green); font-weight: 700; margin-bottom: 4px; }
+    .ws-chat-input { padding: 10px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
+    .ws-chat-field { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--text); }
+    .ws-send-btn { background: var(--green); color: #0B0F14; border: none; border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+    /* Pricing screen */
+    .pricing-layout { padding: 40px 24px; overflow: auto; height: 100%; background: var(--bg); text-align: center; }
+    .pricing-title { font-size: 36px; font-weight: 800; margin-bottom: 10px; }
+    .pricing-sub { font-size: 16px; color: var(--muted); margin-bottom: 40px; }
+    .pricing-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 860px; margin: 0 auto 48px; }
+    .pricing-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; text-align: left; position: relative; }
+    .pricing-card.featured { border-color: var(--green); }
+    .pricing-badge { position: absolute; top: -12px; right: 20px; background: var(--green); color: #0B0F14; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .pricing-plan { font-size: 14px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+    .pricing-price { font-size: 36px; font-weight: 800; margin-bottom: 4px; }
+    .pricing-desc { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .pricing-features { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+    .pricing-features li { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .pricing-features li::before { content: '✓'; color: var(--green); font-weight: 700; }
+    .pricing-cta { width: 100%; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+    .pricing-card.featured .pricing-cta { background: var(--green); color: #0B0F14; border-color: var(--green); }
+    .how-it-works { max-width: 700px; margin: 0 auto; }
+    .how-title { font-size: 24px; font-weight: 700; margin-bottom: 28px; }
+    .how-steps { display: flex; gap: 0; position: relative; }
+    .how-step { flex: 1; text-align: center; padding: 0 16px; }
+    .how-num { width: 40px; height: 40px; border-radius: 50%; background: var(--green); color: #0B0F14; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+    .how-step-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .how-step-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* Import modal */
+    .modal-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 520px; max-height: 80vh; overflow: auto; }
+    .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .modal-tabs { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+    .modal-tab { flex: 1; padding: 9px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; color: var(--muted); }
+    .modal-tab.active { background: #38E07B15; color: var(--green); }
+    .modal-notice { background: #38E07B0A; border: 1px solid #38E07B22; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+    .modal-search { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; margin-bottom: 12px; }
+    .modal-repo-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; cursor: pointer; }
+    .modal-repo-item:hover { border-color: #38E07B55; }
+    .modal-repo-icon { width: 32px; height: 32px; background: var(--bg); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .modal-repo-name { font-size: 13px; font-weight: 600; }
+    .modal-repo-meta { font-size: 11px; color: var(--muted); }
+    .modal-footer { display: flex; gap: 10px; margin-top: 16px; }
+    .modal-cancel { flex: 1; padding: 11px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
+    .modal-import { flex: 2; padding: 11px; border-radius: 8px; border: none; background: var(--green); color: #0B0F14; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      #demo-shell { padding: 12px; }
+      .landing-features { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .health-grid { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+      .pricing-cards { grid-template-columns: 1fr; }
+      .ws-chat { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="demo-shell">
+
+  <!-- Top Bar -->
+  <div id="top-bar">
+    <div class="logo-area">
+      <img src="logo.png" alt="CodeToad logo" onerror="this.style.display='none'" />
+      <span>CodeToad</span>
+      <span class="demo-badge">Interactive Demo</span>
+    </div>
+    <a href="https://codetoad.io" target="_blank" class="cta-btn">
+      Try Free &rarr;
+    </a>
+  </div>
+
+  <!-- Step Navigation -->
+  <div id="step-nav">
+    <div class="step-pill active" data-step="0" onclick="goTo(0)">
+      <span class="step-num">1</span> Landing
+    </div>
+    <span class="step-sep">›</span>
+    <div class="step-pill" data-step="1" onclick="goTo(1)">
+      <span class="step-num">2</span> Sign In
+    </div>
+    <span class="step-sep">›</span>
+    <div class="step-pill" data-step="2" onclick="goTo(2)">
+      <span class="step-num">3</span> Dashboard
+    </div>
+    <span class="step-sep">›</span>
+    <div class="step-pill" data-step="3" onclick="goTo(3)">
+      <span class="step-num">4</span> Import Repo
+    </div>
+    <span class="step-sep">›</span>
+    <div class="step-pill" data-step="4" onclick="goTo(4)">
+      <span class="step-num">5</span> Health Report
+    </div>
+    <span class="step-sep">›</span>
+    <div class="step-pill" data-step="5" onclick="goTo(5)">
+      <span class="step-num">6</span> AI Workspace
+    </div>
+    <span class="step-sep">›</span>
+    <div class="step-pill" data-step="6" onclick="goTo(6)">
+      <span class="step-num">7</span> AI Chat
+    </div>
+    <span class="step-sep">›</span>
+    <div class="step-pill" data-step="7" onclick="goTo(7)">
+      <span class="step-num">8</span> Pricing
+    </div>
+  </div>
+
+  <!-- Screen Viewport -->
+  <div id="screen-viewport">
+    <!-- Browser Chrome -->
+    <div class="browser-chrome">
+      <div class="chrome-dot red"></div>
+      <div class="chrome-dot yellow"></div>
+      <div class="chrome-dot green"></div>
+      <div class="chrome-url" id="url-bar">https://codetoad.io</div>
+    </div>
+
+    <!-- Screen Content -->
+    <div class="screen-content">
+
+      <!-- Screen 0: Landing -->
+      <div class="screen-frame active" id="screen-0">
+        <div class="rendered-screen">
+          <div class="landing-hero">
+            <div class="landing-badge">🐸 AI-Powered Code Analysis</div>
+            <h1 class="landing-h1">Your Codebase,<br/><span>Production-Ready</span></h1>
+            <p class="landing-sub">CodeToad scans your GitHub repositories, identifies bugs, incomplete features, and security issues — then autonomously fixes them with AI agents.</p>
+            <div class="landing-btns">
+              <button class="btn-primary" onclick="goTo(1)">Scan Your Repo Free →</button>
+              <button class="btn-secondary" onclick="goTo(7)">See Pricing</button>
+            </div>
+            <div class="landing-features">
+              <div class="feat-card">
+                <div class="feat-icon">🔍</div>
+                <div class="feat-title">Deep Code Analysis</div>
+                <div class="feat-desc">Scans every file for bugs, security vulnerabilities, incomplete features, and pseudo-code.</div>
+              </div>
+              <div class="feat-card">
+                <div class="feat-icon">🤖</div>
+                <div class="feat-title">Autonomous AI Agents</div>
+                <div class="feat-desc">Claude 3.5 Sonnet agents fix issues end-to-end — no copy-pasting, no manual review loops.</div>
+              </div>
+              <div class="feat-card">
+                <div class="feat-icon">📊</div>
+                <div class="feat-title">Health Score Reports</div>
+                <div class="feat-desc">Shareable health badges and detailed reports across 9 quality dimensions.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Hotspots -->
+        <div class="hotspot" style="top:38%;left:30%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Free Repository Scan</div>
+            Connect your GitHub account and get a full health report in minutes — no credit card required.
+          </div>
+        </div>
+        <div class="hotspot" style="top:65%;left:16%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Deep Code Analysis</div>
+            Detects bugs, security issues, incomplete features, pseudo-code, and TODOs across your entire codebase.
+          </div>
+        </div>
+        <div class="hotspot" style="top:65%;left:50%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Autonomous AI Agents</div>
+            Powered by Claude 3.5 Sonnet with Trigger.dev for long-running jobs up to 15 minutes.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>Welcome to CodeToad!</strong> Click the green hotspots to learn about features, or use the navigation above to explore each screen.
+        </div>
+      </div>
+
+      <!-- Screen 1: Sign In -->
+      <div class="screen-frame" id="screen-1">
+        <div class="rendered-screen">
+          <div class="auth-screen">
+            <div class="auth-card">
+              <div class="auth-title">Sign in to Codetoad</div>
+              <div class="auth-sub">Codetoad needs read-only access to analyze your repository.</div>
+              <button class="auth-github-btn" onclick="goTo(2)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                Sign in with GitHub
+              </button>
+              <div class="auth-divider"><span>or continue with email</span></div>
+              <div class="auth-field">
+                <label class="auth-label">Email address</label>
+                <input class="auth-input" type="email" placeholder="you@example.com" />
+              </div>
+              <div class="auth-field">
+                <label class="auth-label">Password</label>
+                <input class="auth-input" type="password" placeholder="••••••••" />
+              </div>
+              <button class="auth-submit" onclick="goTo(2)">Sign in</button>
+              <div class="auth-trust">
+                <div class="auth-trust-item"><span class="auth-trust-icon">🔒</span> Read-Only Access — CodeToad never writes or pushes code without approval.</div>
+                <div class="auth-trust-item"><span class="auth-trust-icon">🚫</span> No Training on Your Code — Your repositories are never used to train models.</div>
+                <div class="auth-trust-item"><span class="auth-trust-icon">🛡️</span> Secure Authentication — Industry-standard encryption with secure session handling.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hotspot" style="top:28%;left:50%;transform:translateX(-50%)">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">GitHub OAuth</div>
+            One-click sign-in with GitHub. CodeToad requests only read-only repo access — it never pushes code without your explicit approval.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>Sign In Screen.</strong> GitHub OAuth is the fastest path. Email/password also supported. All auth is handled by Supabase with industry-standard security.
+        </div>
+      </div>
+
+      <!-- Screen 2: Dashboard -->
+      <div class="screen-frame" id="screen-2">
+        <div class="rendered-screen">
+          <div class="dash-layout">
+            <div class="dash-sidebar">
+              <div class="sidebar-logo">
+                <img src="logo.png" alt="" onerror="this.style.display='none'" />
+                <span>Codetoad</span>
+              </div>
+              <div class="sidebar-item active">📊 Dashboard</div>
+              <div class="sidebar-item">🔒 Security</div>
+              <div class="sidebar-section">Projects</div>
+              <div class="sidebar-repo">lodash</div>
+              <div class="sidebar-repo">is</div>
+              <div class="sidebar-repo">super-spork</div>
+              <div class="sidebar-repo">crazybananas</div>
+              <div class="sidebar-repo">psychic-octo-tribble</div>
+            </div>
+            <div class="dash-main">
+              <div class="dash-topbar">
+                <div style="display:flex;gap:12px;align-items:center">
+                  <button style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer">Dashboard</button>
+                  <button style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:13px;cursor:pointer">Security</button>
+                </div>
+                <div class="dash-topbar-right">
+                  <div class="connected-badge">✓ Connected</div>
+                  <div class="token-badge">⚡ 4,235 tokens</div>
+                  <button class="buy-btn">Buy</button>
+                  <button style="background:#38E07B15;border:1px solid #38E07B44;color:var(--green);font-size:12px;padding:5px 12px;border-radius:6px;border-radius:6px;cursor:pointer;font-weight:600">🎁 Earn</button>
+                  <span style="font-size:13px;color:var(--muted)">jamiesox</span>
+                </div>
+              </div>
+              <div class="stat-grid">
+                <div class="stat-card">
+                  <div class="stat-icon" style="background:#38E07B15">📁</div>
+                  <div><div class="stat-val">5</div><div class="stat-lbl">Total Repos</div></div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon" style="background:#38E07B15">✅</div>
+                  <div><div class="stat-val" style="color:var(--green)">5</div><div class="stat-lbl">Analyzed</div></div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon" style="background:#FFB02015">⚠️</div>
+                  <div><div class="stat-val" style="color:var(--yellow)">25</div><div class="stat-lbl">Open Issues</div></div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon" style="background:#38E07B15">📈</div>
+                  <div><div class="stat-val" style="color:var(--green);font-family:monospace">95/100</div><div class="stat-lbl">Avg Health</div></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <div>
+                  <h1 style="font-size:24px;font-weight:700;margin-bottom:4px">Your Repositories</h1>
+                  <p style="font-size:13px;color:var(--muted)">Codetoad analyzes your repositories for production readiness.</p>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button style="background:var(--green);color:#0B0F14;border:none;padding:9px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px">⚡ Start a Fix</button>
+                  <button class="buy-btn" style="font-size:13px;padding:9px 18px" onclick="goTo(3)">+ Import Repository</button>
+                </div>
+              </div>
+              <div class="repo-table">
+                <div class="repo-table-header">
+                  <div>Repository</div><div>Status</div><div>Issues</div><div>Health Score</div><div>Actions</div>
+                </div>
+                <div class="repo-row" onclick="goTo(4)">
+                  <div><div class="repo-name">lodash</div><div class="repo-lang">Multiple</div></div>
+                  <div><span class="status-badge">Complete</span></div>
+                  <div class="issue-pills">
+                    <span class="issue-pill pill-inc">5 Incomplete</span>
+                    <span class="issue-pill pill-bug">0 Bugs</span>
+                  </div>
+                  <div class="health-score score-good">95 /100</div>
+                  <div style="display:flex;gap:4px">
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">↗</button>
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">🗑</button>
+                  </div>
+                </div>
+                <div class="repo-row" onclick="goTo(4)">
+                  <div><div class="repo-name">super-spork</div><div class="repo-lang">TypeScript</div></div>
+                  <div><span class="status-badge">Complete</span></div>
+                  <div class="issue-pills">
+                    <span class="issue-pill pill-inc">7 Incomplete</span>
+                    <span class="issue-pill pill-bug">4 Bugs</span>
+                    <span class="issue-pill pill-sec">4 Pseudo</span>
+                  </div>
+                  <div class="health-score score-warn">81 /100</div>
+                  <div style="display:flex;gap:4px">
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">↗</button>
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">🗑</button>
+                  </div>
+                </div>
+                <div class="repo-row" onclick="goTo(4)">
+                  <div><div class="repo-name">crazybananas</div><div class="repo-lang">Astro</div></div>
+                  <div><span class="status-badge">Complete</span></div>
+                  <div class="issue-pills">
+                    <span class="issue-pill pill-inc">2 Incomplete</span>
+                    <span class="issue-pill pill-bug">1 Bug</span>
+                  </div>
+                  <div class="health-score score-good">95 /100</div>
+                  <div style="display:flex;gap:4px">
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">↗</button>
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">🗑</button>
+                  </div>
+                </div>
+                <div class="repo-row" onclick="goTo(4)">
+                  <div><div class="repo-name">psychic-octo-tribble</div><div class="repo-lang">TypeScript</div></div>
+                  <div><span class="status-badge">Complete</span></div>
+                  <div class="issue-pills"><span class="issue-pill" style="background:#38E07B15;color:var(--green)">All Clear ✓</span></div>
+                  <div class="health-score score-good">100 /100</div>
+                  <div style="display:flex;gap:4px">
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">↗</button>
+                    <button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:11px">🗑</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="dash-right">
+              <div class="metrics-title">Portfolio Metrics</div>
+              <div class="metric-card"><div class="metric-lbl">Total Repositories</div><div class="metric-val">5</div></div>
+              <div class="metric-card"><div class="metric-lbl">Analyzed</div><div class="metric-val" style="color:var(--green)">5</div></div>
+              <div class="metric-card"><div class="metric-lbl">Avg Health Score</div><div class="metric-val" style="color:var(--green);font-family:monospace">95/100</div></div>
+              <div class="metric-card">
+                <div class="metric-lbl">Total Issues</div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--yellow)">⚠ Incomplete</span><span>14</span></div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">🐛 Bugs</span><span>6</span></div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">🔒 Security</span><span>0</span></div>
+                </div>
+              </div>
+              <div class="metrics-title" style="margin-top:16px">Upcoming Tasks</div>
+              <div class="task-item"><div class="task-repo">super-spork • Bug</div><div class="task-desc">mvp-generator/page.tsx: Accessing typedChunk.net property that...</div></div>
+              <div class="task-item"><div class="task-repo">super-spork • Bug</div><div class="task-desc">auto-generate-mvp.ts: Missing export for generateMVPFlow...</div></div>
+              <div class="task-item"><div class="task-repo">crazybananas • Bug</div><div class="task-desc">Race condition in useEffect cleanup - state update after...</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="hotspot" style="top:22%;left:42%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Portfolio Overview</div>
+            See all your repos at a glance: total count, analyzed count, open issues, and average health score.
+          </div>
+        </div>
+        <div class="hotspot" style="top:38%;left:88%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Upcoming Tasks</div>
+            Prioritized issue queue across all repos — bugs and security issues surface first.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>Dashboard.</strong> All your repositories in one place. Click any repo row to view its detailed health report, or click <strong>Start a Fix</strong> to launch the AI agent.
+        </div>
+      </div>
+
+      <!-- Screen 3: Import Modal -->
+      <div class="screen-frame" id="screen-3">
+        <div class="rendered-screen">
+          <div class="dash-layout" style="filter:blur(2px)">
+            <div class="dash-sidebar">
+              <div class="sidebar-logo"><span>Codetoad</span></div>
+              <div class="sidebar-item active">📊 Dashboard</div>
+            </div>
+            <div class="dash-main">
+              <div style="padding:20px;color:var(--muted);font-size:14px">Dashboard content...</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-overlay">
+          <div class="modal-box">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+              <div class="modal-title">Import a Repository</div>
+              <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer" onclick="goTo(2)">×</button>
+            </div>
+            <div class="modal-sub">Choose how you want to add a repository to Codetoad.</div>
+            <div class="modal-tabs">
+              <div class="modal-tab active">GitHub</div>
+              <div class="modal-tab">Public Repo URL</div>
+              <div class="modal-tab">Private Repo (PAT)</div>
+            </div>
+            <div class="modal-notice">🔒 Codetoad uses read-only access and never pushes code without approval.</div>
+            <input class="modal-search" type="text" placeholder="Search repositories..." />
+            <div class="modal-repo-item">
+              <div class="modal-repo-icon">📦</div>
+              <div><div class="modal-repo-name">my-saas-app</div><div class="modal-repo-meta">TypeScript · ⭐ 12</div></div>
+            </div>
+            <div class="modal-repo-item" style="border-color:#38E07B55;background:#38E07B08">
+              <input type="checkbox" checked style="accent-color:var(--green)" />
+              <div class="modal-repo-icon">📦</div>
+              <div><div class="modal-repo-name">api-gateway</div><div class="modal-repo-meta">Node.js · ⭐ 3</div></div>
+            </div>
+            <div class="modal-repo-item">
+              <div class="modal-repo-icon">📦</div>
+              <div><div class="modal-repo-name">frontend-v2</div><div class="modal-repo-meta">React · ⭐ 7</div></div>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-cancel" onclick="goTo(2)">Cancel</button>
+              <button class="modal-import" onclick="goTo(4)">Import 1 Repository →</button>
+            </div>
+          </div>
+        </div>
+        <div class="hotspot" style="top:35%;left:55%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">GitHub Integration</div>
+            Browse all your GitHub repos directly. Select one or more to import and analyze simultaneously.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>Import Repository.</strong> Connect via GitHub OAuth, paste a public URL, or use a Personal Access Token for private repos. Analysis starts immediately after import.
+        </div>
+      </div>
+
+      <!-- Screen 4: Health Report -->
+      <div class="screen-frame" id="screen-4">
+        <div class="rendered-screen">
+          <div class="health-layout">
+            <div class="health-back" onclick="goTo(2)">← Back to Dashboard</div>
+            <div class="health-header">
+              <div class="health-repo-icon">🔧</div>
+              <div>
+                <div class="health-repo-name">super-spork</div>
+                <div class="health-repo-meta">TypeScript · Last scan: 1/22/2026</div>
+              </div>
+            </div>
+            <div class="health-actions">
+              <button class="health-action-btn primary" onclick="goTo(5)">⚡ Analyze &amp; Fix</button>
+              <button class="health-action-btn" onclick="goTo(5)">🔧 Quick Refactor</button>
+              <button class="health-action-btn" onclick="goTo(6)">💬 Start Chat</button>
+              <button class="health-action-btn" onclick="goTo(5)">🖥 Open IDE</button>
+              <button class="health-action-btn">↗ Share</button>
+            </div>
+            <div class="health-grid">
+              <div class="health-card">
+                <div class="health-card-title">Health Score</div>
+                <div class="score-ring">
+                  <div class="score-circle">
+                    <svg width="120" height="120" viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#1E2730" stroke-width="10"/>
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#38E07B" stroke-width="10"
+                        stroke-dasharray="314" stroke-dashoffset="47" stroke-linecap="round"/>
+                    </svg>
+                    <div class="score-circle-val">
+                      <div class="score-big">85</div>
+                      <div class="score-denom">/100</div>
+                    </div>
+                  </div>
+                  <div class="score-label">Excellent</div>
+                  <div class="score-issues">15 issues found</div>
+                </div>
+              </div>
+              <div class="health-card">
+                <div class="health-card-title">Issue Distribution</div>
+                <div class="dist-bars">
+                  <div class="dist-bar-wrap">
+                    <div class="dist-bar" style="height:40%;background:#9AA4AE"></div>
+                    <div class="dist-val">4</div>
+                    <div class="dist-lbl">Pseudo-code</div>
+                  </div>
+                  <div class="dist-bar-wrap">
+                    <div class="dist-bar" style="height:70%;background:#FFB020"></div>
+                    <div class="dist-val">7</div>
+                    <div class="dist-lbl">Incomplete</div>
+                  </div>
+                  <div class="dist-bar-wrap">
+                    <div class="dist-bar" style="height:40%;background:#FF5C5C"></div>
+                    <div class="dist-val">4</div>
+                    <div class="dist-lbl">Bugs</div>
+                  </div>
+                  <div class="dist-bar-wrap">
+                    <div class="dist-bar" style="height:5%;background:#FF5C5C"></div>
+                    <div class="dist-val">0</div>
+                    <div class="dist-lbl">Security</div>
+                  </div>
+                  <div class="dist-bar-wrap">
+                    <div class="dist-bar" style="height:5%;background:#9AA4AE"></div>
+                    <div class="dist-val">0</div>
+                    <div class="dist-lbl">TODOs</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="metrics-grid">
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--yellow)">⚠</span>
+                <div class="metric-tile-name">Code Completeness</div>
+                <div class="metric-tile-val" style="color:var(--yellow)">3.0<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--yellow)">⚠</span>
+                <div class="metric-tile-name">Bug Density</div>
+                <div class="metric-tile-val" style="color:var(--yellow)">6.0<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--yellow)">⚠</span>
+                <div class="metric-tile-name">Fix Automation Readiness</div>
+                <div class="metric-tile-val" style="color:var(--yellow)">2.5<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--green)">✓</span>
+                <div class="metric-tile-name">Documentation Coverage</div>
+                <div class="metric-tile-val" style="color:var(--green)">7.8<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--green)">✓</span>
+                <div class="metric-tile-name">Readability Score</div>
+                <div class="metric-tile-val" style="color:var(--green)">8.6<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--green)">✓</span>
+                <div class="metric-tile-name">Performance Risk</div>
+                <div class="metric-tile-val" style="color:var(--green)">8.3<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--green)">✓</span>
+                <div class="metric-tile-name">Consistency Score</div>
+                <div class="metric-tile-val" style="color:var(--green)">8.8<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--yellow)">⚠</span>
+                <div class="metric-tile-name">Test Coverage</div>
+                <div class="metric-tile-val" style="color:var(--yellow)">7.8<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+              <div class="metric-tile">
+                <span class="metric-tile-icon" style="color:var(--green)">✓</span>
+                <div class="metric-tile-name">Security Posture</div>
+                <div class="metric-tile-val" style="color:var(--green)">10.0<span style="font-size:13px;color:var(--muted)">/10</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hotspot" style="top:28%;left:20%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Health Score Ring</div>
+            Visual health score from 0–100. Calculated from bug count, security issues, incomplete features, and code quality metrics.
+          </div>
+        </div>
+        <div class="hotspot" style="top:28%;left:70%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Issue Distribution</div>
+            Bar chart breaking down issues by type: pseudo-code, incomplete features, bugs, security vulnerabilities, and TODOs.
+          </div>
+        </div>
+        <div class="hotspot" style="top:62%;left:50%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">9 Quality Dimensions</div>
+            Detailed scores for code completeness, bug density, documentation, readability, performance, consistency, test coverage, and security posture.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>Health Report.</strong> A full breakdown of your repository's production readiness across 9 quality dimensions. Click <strong>Analyze &amp; Fix</strong> to launch the AI agent.
+        </div>
+      </div>
+
+      <!-- Screen 5: AI Workspace / IDE -->
+      <div class="screen-frame" id="screen-5">
+        <div class="rendered-screen">
+          <div class="workspace-layout">
+            <div class="ws-sidebar">
+              <div class="ws-agent-card">
+                <div class="ws-agent-title">🤖 Autonomous Agent</div>
+                <div class="ws-agent-sub">Auto-fix and complete code</div>
+              </div>
+              <div class="ws-stats">
+                <div class="ws-stat"><div class="ws-stat-val">12</div><div class="ws-stat-lbl">Completed</div></div>
+                <div class="ws-stat"><div class="ws-stat-val warn">5</div><div class="ws-stat-lbl">In Progress</div></div>
+                <div class="ws-stat"><div class="ws-stat-val red">4</div><div class="ws-stat-lbl">Needs Fixing</div></div>
+                <div class="ws-stat"><div class="ws-stat-val warn">7</div><div class="ws-stat-lbl">Needs Completing</div></div>
+              </div>
+              <div class="ws-stat" style="margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;text-align:center">
+                <div class="ws-stat-val" style="color:var(--yellow)">4</div>
+                <div class="ws-stat-lbl">Pseudo Code</div>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px">16 tasks ready for the agent</div>
+              <div class="ws-btns">
+                <button class="ws-btn">✏️ Customize</button>
+                <button class="ws-btn primary" onclick="goTo(6)">▶ Start Agent</button>
+              </div>
+              <div class="ws-files-title">FILES</div>
+              <div class="ws-file active">docs/blueprint.md</div>
+              <div class="ws-file">next.config.ts</div>
+              <div class="ws-file">package.json</div>
+              <div class="ws-file">src/ai/flows/auto-generate-mvp.ts</div>
+              <div class="ws-file">src/app/dashboard/page.tsx</div>
+              <div class="ws-file">src/components/ui/button.tsx</div>
+              <div class="ws-file">tailwind.config.ts</div>
+            </div>
+            <div class="ws-editor">
+              <div class="ws-editor-tabs">
+                <div class="ws-tab active">blueprint.md</div>
+                <div class="ws-tab">Markdown</div>
+              </div>
+              <div class="ws-code">
+<span class="ln">1</span><span class="kw"># **App Name**: NimbusX</span><br/>
+<span class="ln">2</span><br/>
+<span class="ln">3</span><span class="kw">## Core Features:</span><br/>
+<span class="ln">4</span><br/>
+<span class="ln">5</span>- Secure Authentication &amp; Workspace Profiles:<br/>
+<span class="ln">6</span>  Multi-tenant authentication system supporting logins and<br/>
+<span class="ln">7</span>  dedicated workspaces for each user with profile setup,<br/>
+<span class="ln">8</span>  logos, team roles, and permissions.<br/>
+<span class="ln">9</span><br/>
+<span class="ln">10</span>- <span class="str">AI-Powered Onboarding Assistant</span>: Guided onboarding flow<br/>
+<span class="ln">11</span>  that learns user intent and recommends relevant AI<br/>
+<span class="ln">12</span>  agents, modules, and workflows automatically.<br/>
+<span class="ln">13</span><br/>
+<span class="ln">14</span>- <span class="str">Unified Agent Dashboard</span>: Centralized interface to<br/>
+<span class="ln">15</span>  manage all AI agents with live status, task history,<br/>
+<span class="ln">16</span>  performance logs, and in-app chat.<br/>
+<span class="ln">17</span><br/>
+<span class="ln">18</span>- <span class="str">AI Document Engine</span>: Generates and manages structured<br/>
+<span class="ln">19</span>  assets (pitch decks, business plans, financial models,<br/>
+<span class="ln">20</span>  legal documents) with version control, export, and<br/>
+<span class="ln">21</span>  collaboration support using Perplexity API.<br/>
+              </div>
+            </div>
+            <div class="ws-chat">
+              <div class="ws-chat-header">
+                AI Chat<br/><span class="ws-chat-sub">Ask questions about your code</span>
+              </div>
+              <div class="ws-chat-body">
+                <div class="chat-empty">
+                  <div class="chat-empty-icon">💬</div>
+                  <div>Start a conversation about your code</div>
+                </div>
+              </div>
+              <div class="ws-chat-input">
+                <input class="ws-chat-field" type="text" placeholder="Ask about this code..." />
+                <button class="ws-send-btn" onclick="goTo(6)">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hotspot" style="top:20%;left:12%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Autonomous Agent Panel</div>
+            Shows all detected issues categorized by type. The agent works through them autonomously — click Start Agent to begin.
+          </div>
+        </div>
+        <div class="hotspot" style="top:50%;left:48%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Code Editor</div>
+            Browse and read every file in your repository. The AI agent uses this context to make precise, targeted fixes.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>AI Workspace.</strong> The full IDE experience — browse files, view the agent's task queue, and chat with AI about your code. Click <strong>Start Agent</strong> to begin autonomous fixing.
+        </div>
+      </div>
+
+      <!-- Screen 6: AI Chat in action -->
+      <div class="screen-frame" id="screen-6">
+        <div class="rendered-screen">
+          <div class="workspace-layout">
+            <div class="ws-sidebar">
+              <div class="ws-agent-card">
+                <div class="ws-agent-title">🤖 Autonomous Agent</div>
+                <div class="ws-agent-sub">Auto-fix and complete code</div>
+              </div>
+              <div class="ws-stats">
+                <div class="ws-stat"><div class="ws-stat-val">12</div><div class="ws-stat-lbl">Completed</div></div>
+                <div class="ws-stat"><div class="ws-stat-val warn">5</div><div class="ws-stat-lbl">In Progress</div></div>
+              </div>
+              <div class="ws-btns">
+                <button class="ws-btn primary">▶ Start Agent</button>
+              </div>
+              <div class="ws-files-title">FILES</div>
+              <div class="ws-file">src/ai/flows/auto-generate-mvp.ts</div>
+              <div class="ws-file active">src/app/dashboard/mvp-generator/page.tsx</div>
+              <div class="ws-file">src/app/api/generateMVP/route.ts</div>
+            </div>
+            <div class="ws-editor">
+              <div class="ws-editor-tabs">
+                <div class="ws-tab active">mvp-generator/page.tsx</div>
+              </div>
+              <div class="ws-code">
+<span class="ln">1</span><span class="kw">import</span> { <span class="fn">useState</span> } <span class="kw">from</span> <span class="str">'react'</span>;<br/>
+<span class="ln">2</span><span class="kw">import</span> { <span class="fn">generateMVP</span> } <span class="kw">from</span> <span class="str">'@/ai/flows/auto-generate-mvp'</span>;<br/>
+<span class="ln">3</span><br/>
+<span class="ln">4</span><span class="cm">// BUG: Accessing typedChunk.net property that may be undefined</span><br/>
+<span class="ln">5</span><span class="cm">// This causes a runtime crash when the AI stream returns partial chunks</span><br/>
+<span class="ln">6</span><span class="kw">export default function</span> <span class="fn">MVPGeneratorPage</span>() {<br/>
+<span class="ln">7</span>  <span class="kw">const</span> [result, setResult] = <span class="fn">useState</span>(<span class="kw">null</span>);<br/>
+<span class="ln">8</span><br/>
+<span class="ln">9</span>  <span class="kw">const</span> <span class="fn">handleGenerate</span> = <span class="kw">async</span> (prompt: <span class="fn">string</span>) => {<br/>
+<span class="ln">10</span>    <span class="kw">const</span> stream = <span class="kw">await</span> <span class="fn">generateMVP</span>({ prompt });<br/>
+<span class="ln">11</span>    <span class="kw">for await</span> (<span class="kw">const</span> chunk <span class="kw">of</span> stream) {<br/>
+<span class="ln">12</span>      <span class="cm">// ❌ BUG: typedChunk.net is undefined for non-text chunks</span><br/>
+<span class="ln">13</span>      setResult(prev => prev + chunk.net);<br/>
+<span class="ln">14</span>    }<br/>
+<span class="ln">15</span>  };<br/>
+              </div>
+            </div>
+            <div class="ws-chat">
+              <div class="ws-chat-header">
+                AI Chat<br/><span class="ws-chat-sub">Ask questions about your code</span>
+              </div>
+              <div class="ws-chat-body">
+                <div class="chat-msg user">What are the main bugs in this codebase?</div>
+                <div class="chat-msg ai">
+                  <div class="ai-label">CodeToad AI</div>
+                  I found <strong>4 bugs</strong> in this codebase. The most critical is in <code style="background:#0B0F14;padding:1px 4px;border-radius:3px;font-size:11px">mvp-generator/page.tsx</code>:<br/><br/>
+                  <strong>Bug #1:</strong> <code style="background:#0B0F14;padding:1px 4px;border-radius:3px;font-size:11px">typedChunk.net</code> is accessed without a null check. When the AI stream returns non-text chunks, this property is <code style="background:#0B0F14;padding:1px 4px;border-radius:3px;font-size:11px">undefined</code>, causing a runtime crash.<br/><br/>
+                  <strong>Fix:</strong> Change line 13 to:<br/>
+                  <code style="background:#0B0F14;padding:2px 6px;border-radius:3px;font-size:11px;display:block;margin-top:4px">setResult(p => p + (chunk?.net ?? ''));</code>
+                </div>
+              </div>
+              <div class="ws-chat-input">
+                <input class="ws-chat-field" type="text" placeholder="Ask about this code..." />
+                <button class="ws-send-btn">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hotspot" style="top:55%;left:72%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Contextual AI Chat</div>
+            The AI has full context of your entire codebase. Ask about bugs, architecture, security, or request specific refactors.
+          </div>
+        </div>
+        <div class="hotspot" style="top:35%;left:48%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Bug Highlighted in Code</div>
+            The editor shows the exact file and line where the bug was detected, with inline comments explaining the issue.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>AI Chat in Action.</strong> Ask natural language questions about your code. The AI responds with specific file references, line numbers, and ready-to-apply fixes.
+        </div>
+      </div>
+
+      <!-- Screen 7: Pricing -->
+      <div class="screen-frame" id="screen-7">
+        <div class="rendered-screen">
+          <div class="pricing-layout">
+            <h1 class="pricing-title">Simple, Transparent Pricing</h1>
+            <p class="pricing-sub">Start with a free scan. Use tokens for exploration. Buy plans to automate fixes.</p>
+            <div class="pricing-cards">
+              <div class="pricing-card">
+                <div class="pricing-plan">Free Scan</div>
+                <div class="pricing-price">$0</div>
+                <div class="pricing-desc">Perfect to start</div>
+                <ul class="pricing-features">
+                  <li>Full repository health scan</li>
+                  <li>Detailed issue breakdown</li>
+                  <li>Shareable health report</li>
+                  <li>No credit card required</li>
+                </ul>
+                <button class="pricing-cta" onclick="window.open('https://codetoad.io','_blank')">Scan Your Repo Free</button>
+              </div>
+              <div class="pricing-card">
+                <div class="pricing-plan">⚡ Tokens</div>
+                <div class="pricing-price">Pay as you go</div>
+                <div class="pricing-desc">For exploration &amp; chat</div>
+                <ul class="pricing-features">
+                  <li>AI-powered code chat</li>
+                  <li>File-level refactoring</li>
+                  <li>Code exploration playground</li>
+                  <li>Starting at $10 for 100k tokens</li>
+                </ul>
+                <button class="pricing-cta" onclick="window.open('https://codetoad.io','_blank')">Get Started</button>
+              </div>
+              <div class="pricing-card featured">
+                <div class="pricing-badge">BEST VALUE</div>
+                <div class="pricing-plan">🚀 Fix Plans</div>
+                <div class="pricing-price">Custom</div>
+                <div class="pricing-desc">Full repo automation</div>
+                <ul class="pricing-features">
+                  <li>Complete repo fixes</li>
+                  <li>Autonomous agent execution</li>
+                  <li>Production-ready code</li>
+                  <li>Before/after reports</li>
+                </ul>
+                <button class="pricing-cta" onclick="window.open('https://codetoad.io','_blank')">Get Custom Quote</button>
+              </div>
+            </div>
+            <div class="how-it-works">
+              <div class="how-title">How It Works</div>
+              <div class="how-steps">
+                <div class="how-step">
+                  <div class="how-num">1</div>
+                  <div class="how-step-title">Scan Free</div>
+                  <div class="how-step-desc">Connect your repo and get a complete health analysis in minutes</div>
+                </div>
+                <div class="how-step">
+                  <div class="how-num">2</div>
+                  <div class="how-step-title">Explore with Tokens</div>
+                  <div class="how-step-desc">Use tokens to chat with your code and make targeted improvements</div>
+                </div>
+                <div class="how-step">
+                  <div class="how-num">3</div>
+                  <div class="how-step-title">Automate Fixes</div>
+                  <div class="how-step-desc">Buy a plan to let our AI agents make your entire repo production-ready</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hotspot" style="top:35%;left:75%">
+          <div class="hotspot-pulse"></div>
+          <div class="hotspot-tooltip">
+            <div class="tooltip-title">Fix Plans</div>
+            Custom pricing for full repository automation. The AI agent fixes every bug, completes every incomplete feature, and delivers production-ready code.
+          </div>
+        </div>
+        <div id="annotation">
+          <strong>Pricing.</strong> Start free with a full health scan. Pay-as-you-go tokens for AI chat. Custom plans for full autonomous fixing. <a href="https://codetoad.io/pricing" target="_blank" style="color:var(--green)">View live pricing →</a>
+        </div>
+      </div>
+
+    </div><!-- /screen-content -->
+  </div><!-- /screen-viewport -->
+
+  <!-- Bottom Bar -->
+  <div id="bottom-bar">
+    <button class="nav-btn" id="btn-prev" onclick="prev()" disabled>← Previous</button>
+    <span class="step-counter">Step <strong id="step-current">1</strong> of <strong>8</strong></span>
+    <button class="nav-btn primary" id="btn-next" onclick="next()">Next Step →</button>
+  </div>
+
+</div><!-- /demo-shell -->
+
+<script>
+  const STEPS = [
+    { url: 'https://codetoad.io', title: 'Landing Page' },
+    { url: 'https://codetoad.io/auth', title: 'Sign In' },
+    { url: 'https://codetoad.io/dashboard', title: 'Dashboard' },
+    { url: 'https://codetoad.io/dashboard#import', title: 'Import Repository' },
+    { url: 'https://codetoad.io/health/super-spork', title: 'Health Report' },
+    { url: 'https://codetoad.io/workspace/super-spork', title: 'AI Workspace' },
+    { url: 'https://codetoad.io/workspace/super-spork#chat', title: 'AI Chat' },
+    { url: 'https://codetoad.io/pricing', title: 'Pricing' },
+  ];
+
+  let current = 0;
+
+  function goTo(idx) {
+    const prev = current;
+    current = Math.max(0, Math.min(idx, STEPS.length - 1));
+
+    // Update screens
+    document.querySelectorAll('.screen-frame').forEach((el, i) => {
+      el.classList.toggle('active', i === current);
+    });
+
+    // Update step pills
+    document.querySelectorAll('.step-pill').forEach((el) => {
+      const step = parseInt(el.dataset.step);
+      el.classList.toggle('active', step === current);
+    });
+
+    // Update URL bar
+    document.getElementById('url-bar').textContent = STEPS[current].url;
+
+    // Update counter
+    document.getElementById('step-current').textContent = current + 1;
+
+    // Update nav buttons
+    document.getElementById('btn-prev').disabled = current === 0;
+    document.getElementById('btn-next').disabled = current === STEPS.length - 1;
+    document.getElementById('btn-next').textContent = current === STEPS.length - 1 ? 'Try Free →' : 'Next Step →';
+    if (current === STEPS.length - 1) {
+      document.getElementById('btn-next').onclick = () => window.open('https://codetoad.io', '_blank');
+    } else {
+      document.getElementById('btn-next').onclick = next;
+    }
+
+    // Scroll step nav to show active pill
+    const activePill = document.querySelector('.step-pill.active');
+    if (activePill) activePill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  function next() { goTo(current + 1); }
+  function prev() { goTo(current - 1); }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prev();
+  });
+
+  // Initialize
+  goTo(0);
+</script>
+</body>
+</html>
